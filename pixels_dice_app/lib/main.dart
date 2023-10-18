@@ -101,7 +101,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   String diceSubtitle(PixelsDice dice) {
-    return "D${dice.ledCount}, color:${dice.designAndColor}, rollState:${dice.rollState}, batteryLevel: ${dice.batteryLevel}";
+    return "D${dice.ledCount}, color:${dice.designAndColor}, rollState:${dice.rollState}, batteryLevel: ${dice.batteryLevel}, face: ${dice.currentFace + 1}";
   }
 
   @override
