@@ -63,7 +63,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
-    PixelsDice.searchAndConnect();
+    PixelsDiceScanner.searchAndConnect();
     super.initState();
   }
 
@@ -74,8 +74,8 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
       ),
-      body: StreamBuilder<List<PixelsDice>>(
-          stream: PixelsDice.dice,
+      body: StreamBuilder<List<PixelsDie>>(
+          stream: PixelsDiceScanner.dice,
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               return ListView(
@@ -100,13 +100,13 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  String diceSubtitle(PixelsDice dice) {
-    return "D${dice.ledCount}, color:${dice.designAndColor}, rollState:${dice.rollState}, batteryLevel: ${dice.batteryLevel}, face: ${dice.currentFace + 1}";
+  String diceSubtitle(PixelsDie die) {
+    return "D${die.ledCount}, color:${die.designAndColor}, rollState:${die.rollState}, batteryLevel: ${die.batteryLevel}, face: ${die.currentFace + 1}";
   }
 
   @override
   void dispose() {
-    PixelsDice.stopSearching();
+    PixelsDiceScanner.stopSearching();
     super.dispose();
   }
 }
