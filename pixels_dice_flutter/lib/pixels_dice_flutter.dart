@@ -5,7 +5,10 @@ import 'dart:io';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
-final Guid _characteristic = Guid("9ECADC240EE5A9E093F3A3B50000406E");
+//final Guid _characteristic = Guid("9ECADC240EE5A9E093F3A3B50000406E");
+//final Guid _characteristic = Guid("0x6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
+final Guid _service_id = Guid("6E400001B5A3F393E0A9E50E24DCCA9E");
+//final Guid _other_service_id = Guid("0000FE5900001000800000805F9B34FB");
 
 class PixelsDice {
   List<int> _manufactureData;
@@ -36,7 +39,7 @@ class PixelsDice {
           ),
         );
         FlutterBluePlus.startScan(
-          withServices: [_characteristic],
+          withServices: [_service_id],
         );
       }
     });
