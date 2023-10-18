@@ -29,9 +29,12 @@ class PixelsDice {
     _adapterStreamSubscription = FlutterBluePlus.adapterState.listen((state) {
       if (state == BluetoothAdapterState.on) {
         _scanResultSubscription = FlutterBluePlus.scanResults.listen(
-            (results) => _diceStreamController.add(results
+          (results) => _diceStreamController.add(
+            results
                 .map((result) => PixelsDice._fromScanResult(result))
-                .toList()));
+                .toList(),
+          ),
+        );
         FlutterBluePlus.startScan(
           withServices: [_characteristic],
         );
