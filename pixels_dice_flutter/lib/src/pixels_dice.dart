@@ -3,10 +3,17 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:pixels_dice_flutter/src/config_enums.dart';
 import 'package:pixels_dice_flutter/src/pixels_die_messages.dart';
 
 const int manufacturerId = 0xFE59;
 final Guid _serviceId = Guid("6E400001B5A3F393E0A9E50E24DCCA9E");
+
+class RollEvent {
+  DateTime instant;
+  int value;
+  RollEvent({required this.instant, required this.value});
+}
 
 class PixelsDiceScanner {
   static StreamSubscription<BluetoothAdapterState>? _adapterStreamSubscription;
@@ -72,27 +79,74 @@ extension on BluetoothConnectionState {
   }
 }
 
-class PixelsDie {
-  PixelsDie._fromScanResult(this._scanResult);
+class PixelsDieManufactureData {
+  ByteData bytes;
+  PixelsDieManufactureData._(this.bytes);
+  factory PixelsDieManufactureData._fromList(List<int> data) {
+    final byteList = Uint8List.fromList(data);
+    return PixelsDieManufactureData._(ByteData.view(byteList.buffer));
+  }
 
-  AdvertisementData get _advertisementData => _scanResult.advertisementData;
-  List<int> get _manufactureData =>
-      _advertisementData.manufacturerData[manufacturerId]!;
-  List<int> get _serviceData => _advertisementData.serviceData[_serviceId]!;
-  final ScanResult _scanResult;
-  String get name => _advertisementData.localName;
-  int get ledCount => _manufactureData[0];
-  int get designAndColor => _manufactureData[1];
-  int get rollState => _manufactureData[2];
-  int get currentFace => _manufactureData[3];
-  bool get charging => (_manufactureData[4] & 0x80) == 0x80;
-  int get batteryLevel => _manufactureData[4] & 0x7F;
-  BluetoothDevice get _device => _scanResult.device;
+  factory PixelsDieManufactureData._fromScanResult(ScanResult result) {
+    final manufactureData = result.advertisementData.manufacturerData;
+    if (!manufactureData.containsKey(manufacturerId)) throw ArgumentError();
+    return PixelsDieManufactureData._fromList(manufactureData[manufacturerId]!);
+  }
+
+  int get ledCount => bytes.getUint8(0);
+  Colorway get designAndColor => Colorway.fromValue(bytes.getUint8(1));
+  RollState get rollState => RollState.fromValue(bytes.getUint8(2));
+  int get currentFace => bytes.getUint8(3);
+  bool get charging => (bytes.getUint8(4) & 0x80) == 0x80;
+  int get batteryLevel => bytes.getUint8(4) & 0x7F;
+
+  @override
+  String toString() =>
+      "leds: $ledCount, color: $designAndColor, rollState: $rollState, "
+      "face: $currentFace, charging: $charging, batteryLevel: $batteryLevel";
+}
+
+class PixelsServiceData {
+  ByteData bytes;
+  PixelsServiceData._(this.bytes) : assert(bytes.lengthInBytes == 8);
+
+  factory PixelsServiceData._fromList(List<int> data) {
+    final byteList = Uint8List.fromList(data);
+    return PixelsServiceData._(ByteData.view(byteList.buffer));
+  }
+
+  factory PixelsServiceData._fromScanResult(ScanResult result) {
+    final serviceData = result.advertisementData.serviceData;
+    if (!serviceData.containsKey(_serviceId)) throw ArgumentError();
+    return PixelsServiceData._fromList(serviceData[_serviceId]!);
+  }
+
+  int get pixelId => bytes.getUint32(0);
+  int get buildTimestampUnix => bytes.getUint32(4);
+
+  @override
+  String toString() => "pixelId: $pixelId, buildTimestamp: $buildTimestampUnix";
+}
+
+class PixelsDie {
+  PixelsDie._fromScanResult(ScanResult scanResult)
+      : name = scanResult.advertisementData.localName,
+        manufactureData = PixelsDieManufactureData._fromScanResult(scanResult),
+        serviceData = PixelsServiceData._fromScanResult(scanResult),
+        _device = scanResult.device;
+
+  final String name;
+  final PixelsDieManufactureData manufactureData;
+  final PixelsServiceData serviceData;
+  final BluetoothDevice _device;
+
   Stream<PixelsDieConnectionState> get connectionState =>
       _device.connectionState.map((state) => state.toPixelsConnectionState());
   StreamSubscription<List<int>>? _notifySubscription;
 
-  void connect() async {
+  RollState previousRollState = RollState.unknown;
+
+  Future<void> connect() async {
     await _device.connect();
     final services = await _device.discoverServices();
     BluetoothService dieService =
@@ -118,10 +172,16 @@ class PixelsDie {
     final bytes = ByteData.view(byteList.buffer);
     final message = bytes.parsePixelsMessage();
     if (message is RollStateMessage) {
-      print(message);
+      if (previousRollState == RollState.rolling &&
+          message.rollState == RollState.onFace) {
+        _rollController.add(
+          RollEvent(instant: DateTime.now(), value: message.currentFace),
+        );
+      }
+      previousRollState = message.rollState;
     }
   }
 
-  final _rollController = StreamController<int>();
-  Stream get rollEvents => _rollController.stream;
+  final _rollController = StreamController<RollEvent>();
+  Stream<RollEvent> get rollEvents => _rollController.stream;
 }
