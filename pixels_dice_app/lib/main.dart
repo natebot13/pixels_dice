@@ -140,27 +140,30 @@ class PixelsDiePage extends StatelessWidget {
           children: [
             Hero(tag: die.name, child: ListTile(title: Text(die.name))),
             Expanded(
-              child: StreamBuilder(
-                stream: die.rollEvents,
-                initialData: RollEvent(
-                  instant: DateTime.now(),
-                  value: die.manufactureData.currentFace,
+              child: Center(
+                child: StreamBuilder(
+                  stream: die.rollEvents,
+                  initialData: RollEvent(
+                    instant: DateTime.now(),
+                    value: die.manufactureData.currentFace,
+                  ),
+                  builder: (context, snapshot) {
+                    final roll = snapshot.data!;
+                    return AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 500),
+                      transitionBuilder: (child, animation) =>
+                          RotationTransition(
+                        turns: animation,
+                        child: child,
+                      ),
+                      child: Text(
+                        "${roll.value}",
+                        key: ValueKey<DateTime>(roll.instant),
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                    );
+                  },
                 ),
-                builder: (context, snapshot) {
-                  final roll = snapshot.data!;
-                  return AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 500),
-                    transitionBuilder: (child, animation) => RotationTransition(
-                      turns: animation,
-                      child: child,
-                    ),
-                    child: Text(
-                      "${roll.value}",
-                      key: ValueKey<DateTime>(roll.instant),
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                  );
-                },
               ),
             )
           ],
