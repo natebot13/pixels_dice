@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:pixels_dice_flutter/src/pixels_die_messages.dart';
 
 const int manufacturerId = 0xFE59;
 final Guid _serviceId = Guid("6E400001B5A3F393E0A9E50E24DCCA9E");
@@ -112,7 +114,12 @@ class PixelsDie {
   }
 
   void receiveEvent(List<int> data) {
-    // TODO: receive cool data
+    Uint8List byteList = Uint8List.fromList(data);
+    final bytes = ByteData.view(byteList.buffer);
+    final message = bytes.parsePixelsMessage();
+    if (message is RollStateMessage) {
+      print(message);
+    }
   }
 
   final _rollController = StreamController<int>();
