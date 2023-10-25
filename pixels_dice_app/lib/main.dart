@@ -83,19 +83,21 @@ class _MyHomePageState extends State<MyHomePage> {
                     .map(
                       (die) => Hero(
                         tag: die.name,
-                        child: ListTile(
-                          isThreeLine: true,
-                          title: Text(die.name),
-                          subtitle: Text(die.manufactureData.toString()),
-                          onTap: () {
-                            PixelsDiceScanner.stopSearching();
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => PixelsDiePage(die: die),
-                              ),
-                            );
-                          },
+                        child: Material(
+                          child: ListTile(
+                            isThreeLine: true,
+                            title: Text(die.name),
+                            subtitle: Text(die.manufactureData.toString()),
+                            onTap: () {
+                              PixelsDiceScanner.stopSearching();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PixelsDiePage(die: die),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     )
@@ -126,49 +128,58 @@ class PixelsDiePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: die.connect(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          final snack = SnackBar(content: Text(snapshot.error!.toString()));
-          ScaffoldMessenger.of(context).showSnackBar(snack);
-          PixelsDiceScanner.searchAndConnect();
-          Navigator.pop(context);
-        }
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Hero(tag: die.name, child: ListTile(title: Text(die.name))),
-            Expanded(
-              child: Center(
-                child: StreamBuilder(
-                  stream: die.rollEvents,
-                  initialData: RollEvent(
-                    instant: DateTime.now(),
-                    value: die.manufactureData.currentFace,
-                  ),
-                  builder: (context, snapshot) {
-                    final roll = snapshot.data!;
-                    return AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 500),
-                      transitionBuilder: (child, animation) =>
-                          RotationTransition(
-                        turns: animation,
-                        child: child,
-                      ),
-                      child: Text(
-                        "${roll.value}",
-                        key: ValueKey<DateTime>(roll.instant),
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                    );
-                  },
-                ),
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text(die.name),
+      ),
+      body: FutureBuilder(
+        future: die.connect(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            final snack = SnackBar(content: Text(snapshot.error!.toString()));
+            ScaffoldMessenger.of(context).showSnackBar(snack);
+            PixelsDiceScanner.searchAndConnect();
+            Navigator.pop(context);
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Hero(
+                tag: die.name,
+                child: Material(child: ListTile(title: Text(die.name))),
               ),
-            )
-          ],
-        );
-      },
+              Expanded(
+                child: Center(
+                  child: StreamBuilder(
+                    stream: die.rollEvents,
+                    initialData: RollEvent(
+                      instant: DateTime.now(),
+                      value: die.manufactureData.currentFace,
+                    ),
+                    builder: (context, snapshot) {
+                      final roll = snapshot.data!;
+                      return AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 500),
+                        transitionBuilder: (child, animation) =>
+                            RotationTransition(
+                          turns: animation,
+                          child: child,
+                        ),
+                        child: Text(
+                          "${roll.value}",
+                          key: ValueKey<DateTime>(roll.instant),
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              )
+            ],
+          );
+        },
+      ),
     );
   }
 }
