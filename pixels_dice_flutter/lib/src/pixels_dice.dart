@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -22,16 +21,20 @@ class PixelsDiceScanner {
   static searchAndConnect() {
     _adapterStreamSubscription?.cancel();
     _adapterStreamSubscription = FlutterBluePlus.adapterState.listen((state) {
+      print(state);
       if (state == BluetoothAdapterState.on) {
-        // _diceStreamController.add([FakePixelsDie()]);
-        _scanResultSubscription = FlutterBluePlus.scanResults.listen(
-          (results) => _diceStreamController.add(
-            results.map((result) => PixelsDie._fromScanResult(result)).toList(),
-          ),
-        );
-        FlutterBluePlus.startScan(
-          withServices: [_serviceId],
-        );
+        _scanResultSubscription = FlutterBluePlus.scanResults.listen((results) {
+          if (results.isNotEmpty) {
+            _diceStreamController.add(
+              results
+                  .map((result) => PixelsDie._fromScanResult(result))
+                  .toList(),
+            );
+          }
+        });
+        FlutterBluePlus.startScan(withServices: [_serviceId]);
+      } else {
+        FlutterBluePlus.turnOn();
       }
     });
   }
@@ -96,7 +99,8 @@ class PixelsDieManufactureData {
   }
 
   int get ledCount => _bytes.getUint8(0);
-  Colorway get designAndColor => Colorway.fromValue(_bytes.getUint8(1));
+  DieType get dieType => DieType.fromValue(_bytes.getUint8(1) >> 4);
+  Colorway get colorway => Colorway.fromValue(_bytes.getUint8(1) & 0x0F);
   RollState get rollState => RollState.fromValue(_bytes.getUint8(2));
   int get currentFace => _bytes.getUint8(3);
   bool get charging => (_bytes.getUint8(4) & 0x80) == 0x80;
@@ -104,35 +108,7 @@ class PixelsDieManufactureData {
 
   @override
   String toString() =>
-      "leds: $ledCount, color: $designAndColor, rollState: $rollState, "
-      "face: $currentFace, charging: $charging, batteryLevel: $batteryLevel";
-}
-
-class FakeManufactureData implements PixelsDieManufactureData {
-  @override
-  int get batteryLevel => 50;
-
-  @override
-  bool get charging => false;
-
-  @override
-  int get currentFace => 5;
-
-  @override
-  Colorway get designAndColor => Colorway.custom;
-
-  @override
-  int get ledCount => 20;
-
-  @override
-  RollState get rollState => RollState.onFace;
-
-  @override
-  ByteData _bytes = ByteData(0);
-
-  @override
-  String toString() =>
-      "leds: $ledCount, color: $designAndColor, rollState: $rollState, "
+      "leds: $ledCount, dieType: $dieType, color: $colorway, rollState: $rollState, "
       "face: $currentFace, charging: $charging, batteryLevel: $batteryLevel";
 }
 
@@ -147,8 +123,9 @@ class PixelsServiceData {
 
   factory PixelsServiceData._fromScanResult(ScanResult result) {
     final serviceData = result.advertisementData.serviceData;
-    if (!serviceData.containsKey(0x180A)) throw ArgumentError();
-    return PixelsServiceData._fromList(serviceData[0x180A]!);
+    print(serviceData);
+    if (!serviceData.containsKey(Guid("180a"))) throw ArgumentError();
+    return PixelsServiceData._fromList(serviceData[Guid("180a")]!);
   }
 
   int get pixelId => _bytes.getUint32(0);
@@ -158,20 +135,9 @@ class PixelsServiceData {
   String toString() => "pixelId: $pixelId, buildTimestamp: $buildTimestampUnix";
 }
 
-class FakeServiceData implements PixelsServiceData {
-  @override
-  ByteData _bytes = ByteData(0);
-
-  @override
-  int get buildTimestampUnix => DateTime(2023, 10, 24).millisecondsSinceEpoch;
-
-  @override
-  int get pixelId => 0xDEADBEEF;
-}
-
 class PixelsDie {
   PixelsDie._fromScanResult(ScanResult scanResult)
-      : name = scanResult.advertisementData.localName,
+      : name = scanResult.advertisementData.advName,
         manufactureData = PixelsDieManufactureData._fromScanResult(scanResult),
         serviceData = PixelsServiceData._fromScanResult(scanResult),
         _device = scanResult.device;
@@ -225,72 +191,4 @@ class PixelsDie {
 
   final _rollController = StreamController<RollEvent>();
   Stream<RollEvent> get rollEvents => _rollController.stream;
-}
-
-class FakePixelsDie implements PixelsDie {
-  final _connectionController = StreamController<PixelsDieConnectionState>();
-
-  @override
-  final _rollController = StreamController<RollEvent>();
-
-  final _random = Random();
-
-  FakePixelsDie() {
-    Stream.periodic(const Duration(seconds: 3), (_) {
-      final rollStateIndex = _random.nextInt(RollState.values.length);
-      final newRollState = RollState.values[rollStateIndex];
-      if (previousRollState == RollState.rolling &&
-          newRollState == RollState.onFace) {
-        _rollController.sink.add(
-          RollEvent(
-            instant: DateTime.now(),
-            value: _random.nextInt(20) + 1,
-          ),
-        );
-      }
-    });
-  }
-
-  @override
-  RollState previousRollState = RollState.unknown;
-
-  @override
-  Future<void> connect() {
-    return Future.delayed(
-      const Duration(milliseconds: 10),
-      () => _connectionController.sink.add(PixelsDieConnectionState.connected),
-    );
-  }
-
-  @override
-  Stream<PixelsDieConnectionState> get connectionState =>
-      _connectionController.stream;
-
-  @override
-  void disconnect() {
-    Future.delayed(
-      const Duration(milliseconds: 10),
-      () =>
-          _connectionController.sink.add(PixelsDieConnectionState.disconnected),
-    );
-  }
-
-  @override
-  String get name => 'FakeDie';
-
-  @override
-  PixelsDieManufactureData get manufactureData => FakeManufactureData();
-
-  @override
-  PixelsServiceData get serviceData => FakeServiceData();
-
-  @override
-  Stream<RollEvent> get rollEvents => _rollController.stream;
-
-  @override
-  void _receiveEvent(List<int> data) => throw UnimplementedError();
-  @override
-  StreamSubscription<List<int>>? _notifySubscription;
-  @override
-  BluetoothDevice get _device => throw UnimplementedError();
 }

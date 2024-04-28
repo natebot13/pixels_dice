@@ -64,6 +64,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     PixelsDiceScanner.searchAndConnect();
+    print("scanning");
     super.initState();
   }
 
@@ -78,6 +79,7 @@ class _MyHomePageState extends State<MyHomePage> {
           stream: PixelsDiceScanner.dice,
           builder: (context, snapshot) {
             if (snapshot.hasData) {
+              print("have data: ${snapshot.data}");
               return ListView(
                 children: snapshot.data!
                     .map(
@@ -104,6 +106,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     .toList(),
               );
             } else {
+              print("searching");
               return const CircularProgressIndicator();
             }
           }),
